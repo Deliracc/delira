@@ -1,14 +1,18 @@
 <p align="center">
-  <a href="https://delira.cc"><img src="assets/banner.png" alt="DELIRA: a wallet with rails for AI agents. Your agent asks. Five rails decide. Then it signs." width="100%"></a>
+  <a href="https://delira.cc"><img src="assets/banner.jpg" alt="DELIRA: a wallet with rails for AI agents. Five rails, PROOF, LIMIT, ROUTE, PLAIN and WAIT, decide what an agent may sign." width="100%"></a>
 </p>
 
+<h3 align="center">A wallet with rails for AI agents</h3>
+<p align="center"><i>Your agent asks. Five rails decide. Then it signs.</i></p>
+
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1f3bff" alt="MIT license"></a>
-  <a href="engine/test/rails-test.mjs"><img src="https://img.shields.io/badge/tests-103%20passing-0a8f5a" alt="103 tests passing"></a>
-  <img src="https://img.shields.io/badge/dependencies-0-1f3bff" alt="No dependencies">
-  <img src="https://img.shields.io/badge/node-%E2%89%A522.13-1f3bff" alt="Node 22.13 or newer">
-  <a href="sdk/mcp/README.md"><img src="https://img.shields.io/badge/MCP-ready-8296ff" alt="MCP ready"></a>
-  <img src="https://img.shields.io/badge/status-beta-ff5a1f" alt="Beta">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1f3bff?style=flat-square" alt="MIT license"></a>
+  <a href="engine/test/rails-test.mjs"><img src="https://img.shields.io/badge/tests-103%20passing-0a8f5a?style=flat-square" alt="103 tests passing"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-1f3bff?style=flat-square" alt="No dependencies">
+  <img src="https://img.shields.io/badge/node-%E2%89%A522.13-1f3bff?style=flat-square" alt="Node 22.13 or newer">
+  <a href="sdk/mcp/README.md"><img src="https://img.shields.io/badge/MCP-ready-1f3bff?style=flat-square" alt="MCP ready"></a>
+  <img src="https://img.shields.io/badge/networks-5-1f3bff?style=flat-square" alt="Five networks">
+  <img src="https://img.shields.io/badge/status-beta-ff5a1f?style=flat-square" alt="Beta">
 </p>
 
 <p align="center">

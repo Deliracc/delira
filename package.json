@@ -1,0 +1,10 @@
+{
+  "name": "delira-rails",
+  "version": "1.0.0",
+  "description": "The DELIRA rails engine: an agent wallet that signs only what PROOF, LIMIT, ROUTE, PLAIN and WAIT allow. Docs, SDKs and an MCP bridge.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.13" },
+  "scripts": { "test": "node engine/test/rails-test.mjs" },
+  "homepage": "https://delira.cc"
+}

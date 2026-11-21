@@ -1,0 +1,281 @@
+openapi: 3.1.0
+info:
+  title: DELIRA Agent API
+  version: 1.0.0
+  summary: The rails for AI agents. An agent asks; PROOF, LIMIT, ROUTE, PLAIN and WAIT decide; DELIRA signs only what passes.
+  description: |
+    Endpoints an agent calls with a DELIRA API key (`Authorization: Bearer dlr_…`).
+    A key can read by default. To pay, the owner turns on **Can pay** for that key in the agent wallet panel.
+    A rail stop is not an HTTP error: it is a normal response with `status: stopped`, the `rail` and a `reason`.
+    Every rail is explained in the technical book (03-rails.md); user docs: https://delira.cc/docs#agent-wallet.
+servers:
+  - url: https://delira.cc
+security:
+  - apiKey: []
+tags:
+  - name: rails
+    description: The agent wallet and payment requests
+  - name: models
+    description: OpenAI-compatible chat models
+  - name: mcp
+    description: The rails as MCP tools
+paths:
+  /api/v1/rails/wallet:
+    get:
+      tags: [rails]
+      operationId: getWallet
+      summary: The agent wallet, its caps, allowed addresses and balances
+      responses:
+        '200':
+          description: Wallet overview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wallet' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /api/v1/rails/request:
+    post:
+      tags: [rails]
+      operationId: createRequest
+      summary: Ask DELIRA to pay or approve from the agent wallet
+      description: |
+        The five rails run in order; the first stop ends the check. Use the same `idempotency_key` for retries of the same job:
+        it always returns the same request, so nothing is paid twice. `dry_run` checks without saving.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentRequest' }
+            examples:
+              pay:
+                value:
+                  action: pay
+                  chain: base
+                  asset: USDC
+                  to: '0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a01'
+                  amount: '1.5'
+                  memo: weekly price report from data-agent
+                  proof: { source: invoice, ref: INV-1042, usd: 1.5 }
+                  idempotency_key: job-1042
+      responses:
+        '201':
+          description: A new request (queued, waiting or stopped)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Request' }
+        '200':
+          description: The same idempotency_key was used before (that request is returned), or a dry run
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Request' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403':
+          description: The key does not have Can pay
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The account has no agent wallet yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+      callbacks:
+        statusChange:
+          '{$request.body#/callback_url}':
+            post:
+              summary: Sent on every status change of the request
+              description: |
+                Headers: `x-delira-event: rails.request`, `x-delira-signature: sha256=<hex>`.
+                The signature is HMAC-SHA-256 of the raw body; the secret is the SHA-256 (hex) of your API key.
+                Retried after 30 s, 1, 2, 4 and 8 minutes.
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        event: { type: string, const: rails.request }
+                        at: { type: string, format: date-time }
+                        data: { $ref: '#/components/schemas/Request' }
+              responses:
+                '200': { description: Received }
+  /api/v1/rails/requests/{id}:
+    get:
+      tags: [rails]
+      operationId: getRequest
+      summary: A request by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Request' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/models:
+    get:
+      tags: [models]
+      operationId: listModels
+      summary: Models this server serves (OpenAI-compatible)
+      security: []
+      responses:
+        '200': { description: 'A list: { object: "list", data: [{ id, object, owned_by, context_length }] }' }
+  /api/v1/chat/completions:
+    post:
+      tags: [models]
+      operationId: chatCompletions
+      summary: OpenAI-compatible chat completions, streaming or not
+      description: Charged like the chat (free daily messages on free models, then the account balance).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: An OpenAI chat completions request }
+      responses:
+        '200': { description: An OpenAI chat completions response or an SSE stream }
+        '402': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /api/v1/mcp:
+    post:
+      tags: [mcp]
+      operationId: mcp
+      summary: MCP Streamable HTTP endpoint (stateless JSON responses)
+      description: |
+        One JSON-RPC message or a batch per POST. Tools: delira_wallet, delira_pay, delira_approve, delira_status.
+        Notifications get 202 with no body. GET returns 405 (no server-sent stream).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: A JSON-RPC 2.0 message (or an array of them) }
+      responses:
+        '200': { description: JSON-RPC response(s) }
+        '202': { description: Accepted notification }
+        '401': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: dlr_ + 40 characters
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message: { type: string }
+    Chain:
+      type: string
+      enum: [ethereum, bsc, polygon, arbitrum, base]
+    PaymentRequest:
+      type: object
+      required: [chain]
+      properties:
+        action: { type: string, enum: [pay, approve, raw], default: pay }
+        chain: { $ref: '#/components/schemas/Chain' }
+        asset: { type: string, enum: [USDC, USDT, ETH, BNB], description: 'Base: USDC, ETH. BNB Chain: USDT, USDC, BNB. Polygon: USDT, USDC. Arbitrum and Ethereum: USDT, USDC, ETH.' }
+        to: { type: string, pattern: '^0x[0-9a-fA-F]{40}$', description: Recipient, or the spender for approve, or the contract for raw }
+        amount: { type: string, description: 'Decimal amount like "1.5". For approve, "unlimited" is accepted only so PLAIN can refuse it.' }
+        value: { type: string, description: 'raw only: wei as an integer string' }
+        data: { type: string, pattern: '^0x([0-9a-fA-F]{2})*$', description: 'raw only: calldata' }
+        memo: { type: string, maxLength: 300, description: Who, what and why. Without it WAIT returns a question. }
+        proof:
+          type: object
+          properties:
+            source: { type: string, enum: [invoice, quote, feed, contract] }
+            ref: { type: string, minLength: 3 }
+            usd: { type: number, description: Required for feed; compared with the live price }
+        idempotency_key: { type: string, maxLength: 80 }
+        dry_run: { type: boolean }
+        callback_url: { type: string, format: uri, description: https on a public host }
+    Check:
+      type: object
+      properties:
+        rail: { type: string, enum: [PROOF, LIMIT, ROUTE, PLAIN, WAIT, OWNER] }
+        result: { type: string, enum: [pass, stop, wait, skip] }
+        note: { type: string }
+    Request:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [stopped, waiting, queued, signed, sent, confirmed, failed, cancelled] }
+        kind: { type: string, enum: [pay, approve, raw, withdraw] }
+        rail: { type: [string, 'null'] }
+        reason: { type: [string, 'null'] }
+        question: { type: boolean, description: WAIT wants a memo }
+        plain: { type: [string, 'null'], description: What will happen, in one sentence }
+        chain: { $ref: '#/components/schemas/Chain' }
+        network: { type: string }
+        asset: { type: [string, 'null'] }
+        to: { type: string }
+        amount: { type: [string, 'null'] }
+        usd: { type: string }
+        memo: { type: string }
+        checks: { type: array, items: { $ref: '#/components/schemas/Check' } }
+        tx: { type: [string, 'null'] }
+        explorer: { type: [string, 'null'] }
+        created: { type: integer, description: Unix ms }
+        release_at: { type: [integer, 'null'], description: 'waiting: when it goes out unless cancelled (Unix ms)' }
+        via: { type: [string, 'null'] }
+        fee_bumps: { type: integer }
+        callback: { type: boolean }
+        dry_run: { type: boolean }
+        repeated: { type: boolean }
+    Wallet:
+      type: object
+      properties:
+        wallet:
+          type: object
+          properties:
+            address: { type: string }
+            shown: { type: string, description: EIP-55 checksummed }
+            created: { type: integer }
+        used_today: { type: string }
+        settings:
+          type: object
+          properties:
+            daily_usd: { type: number }
+            per_tx_usd: { type: number }
+            wait_usd: { type: number }
+            timelock_min: { type: integer }
+            paused: { type: boolean }
+            chains: { type: array, items: { $ref: '#/components/schemas/Chain' } }
+            allow:
+              type: array
+              items:
+                type: object
+                properties:
+                  address: { type: string }
+                  label: { type: string }
+        balances:
+          type: array
+          items:
+            type: object
+            properties:
+              chain: { $ref: '#/components/schemas/Chain' }
+              name: { type: string }
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    asset: { type: string }
+                    amount: { type: string }
+                    gas: { type: boolean }
+              error: { type: string }
